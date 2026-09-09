@@ -43,11 +43,15 @@ DEFAULT_AGENT_SPECS = [
 ]
 
 
-def env_bool(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+def boolean_arg(value: str) -> bool:
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "n", "off"}:
+        return False
+    raise argparse.ArgumentTypeError(
+        f"expected a boolean value (true/false), got {value!r}"
+    )
 
 
 def build_agents(model_specs: str | None = None, *, temperature: float = 0.5) -> list[AgentConfig]:
@@ -220,18 +224,16 @@ def run_sample(
     max_stage1_workers: int | None,
     stage2_max_tokens: int,
     enable_stage2_score: bool,
-    enable_stage1_early_stop: bool,
-    enable_stage1_tool_use: bool,
+    enable_agent_tool_use: bool,
     enable_evidence_prepare: bool,
     enable_compact_search_evidence: bool,
     enable_evidence_driven_search: bool,
     bypass_search_labeler: bool,
     max_parallel_next_hop_queries: int,
-    enable_candidate_verification_search: bool,
     candidate_verification_max_queries: int,
     candidate_verification_workers: int,
-    max_stage1_tool_turns: int,
-    stage1_prepared_search_budget: int,
+    max_agent_tool_turns: int,
+    agent_prepared_search_budget: int,
     previous_best_agent_id: str | None,
     stage1_early_stop_max_retries: int,
     stage2_verifier: str,
@@ -239,7 +241,6 @@ def run_sample(
     versa_prm_base_model: str,
     versa_prm_device: str,
     versa_prm_dtype: str,
-    versa_prm_local_files_only: bool,
 ) -> dict[str, Any]:
     start_time = time.time()
     network = Network(
@@ -251,18 +252,18 @@ def run_sample(
         max_stage1_workers=max_stage1_workers,
         stage2_max_tokens=stage2_max_tokens,
         enable_stage2_score=enable_stage2_score,
-        enable_stage1_early_stop=enable_stage1_early_stop,
-        enable_stage1_tool_use=enable_stage1_tool_use,
+        enable_stage1_early_stop=False,
+        enable_stage1_tool_use=enable_agent_tool_use,
         enable_evidence_prepare=enable_evidence_prepare,
         enable_compact_search_evidence=enable_compact_search_evidence,
         enable_evidence_driven_search=enable_evidence_driven_search,
         bypass_search_labeler=bypass_search_labeler,
         max_parallel_next_hop_queries=max_parallel_next_hop_queries,
-        enable_candidate_verification_search=enable_candidate_verification_search,
+        enable_candidate_verification_search=False,
         candidate_verification_max_queries=candidate_verification_max_queries,
         candidate_verification_workers=candidate_verification_workers,
-        max_stage1_tool_turns=max_stage1_tool_turns,
-        stage1_prepared_search_budget=stage1_prepared_search_budget,
+        max_stage1_tool_turns=max_agent_tool_turns,
+        stage1_prepared_search_budget=agent_prepared_search_budget,
         previous_best_agent_id=previous_best_agent_id,
         stage1_early_stop_max_retries=stage1_early_stop_max_retries,
         reference_answer=str(sample.get("final_answer", "") or ""),
@@ -271,7 +272,7 @@ def run_sample(
         versa_prm_base_model=versa_prm_base_model,
         versa_prm_device=versa_prm_device,
         versa_prm_dtype=versa_prm_dtype,
-        versa_prm_local_files_only=versa_prm_local_files_only,
+        versa_prm_local_files_only=True,
     )
 
     vram_before = gpu_memory.begin_task()
@@ -1072,15 +1073,13 @@ def run_gaia_evaluation(args: argparse.Namespace) -> dict[str, Any]:
     # print(f"[INFO] versa_prm_base_model={args.versa_prm_base_model}")
     # print(f"[INFO] versa_prm_device={args.versa_prm_device}")
     # print(f"[INFO] versa_prm_dtype={args.versa_prm_dtype}")
-    # print(f"[INFO] versa_prm_local_files_only={args.versa_prm_local_files_only}")
-    # print(f"[INFO] enable_stage1_tool_use={args.enable_stage1_tool_use}")
+    # print(f"[INFO] enable_agent_tool_use={args.enable_agent_tool_use}")
     # print(f"[INFO] evidence_prepare={args.evidence_prepare}")
     # print(f"[INFO] compact_search_evidence={args.compact_search_evidence}")
     # print("[INFO] query_planner=signal")
     # print(f"[INFO] enable_evidence_driven_search={args.enable_evidence_driven_search}")
     # print(f"[INFO] max_parallel_next_hop_queries={args.max_parallel_next_hop_queries}")
-    # print(f"[INFO] max_stage1_tool_turns={args.max_stage1_tool_turns}")
-    # print(f"[INFO] enable_stage1_early_stop={args.enable_stage1_early_stop}")
+    # print(f"[INFO] max_agent_tool_turns={args.max_agent_tool_turns}")
     # print(f"[INFO] stage1_early_stop_max_retries={args.stage1_early_stop_max_retries}")
     print(f"[INFO] log_name={safe_filename(args.log_name, 'gaia_run')}")
     print(f"[INFO] task_json_dir={output_dir.resolve()}")
@@ -1092,15 +1091,13 @@ def run_gaia_evaluation(args: argparse.Namespace) -> dict[str, Any]:
         versa_cache_warmup = ensure_versa_prm_model_cache(
             model_id=args.versa_prm_model,
             base_model_id=args.versa_prm_base_model,
-            allow_download=not args.versa_prm_cache_warmup_local_only,
+            allow_download=False,
         )
         model_ok = bool((versa_cache_warmup.get("model") or {}).get("ok"))
         base_ok = bool((versa_cache_warmup.get("base_model") or {}).get("ok"))
         print(f"[INFO] versa_prm_cache_warmup model_ok={model_ok} base_model_ok={base_ok}")
         if not model_ok or not base_ok:
             raise RuntimeError(f"VersaPRM cache warm-up failed: {versa_cache_warmup}")
-        args.versa_prm_local_files_only = True
-
     previous_best_agent_id: str | None = None
     agent_exact_counts: dict[str, int] = {}
     for index, sample in enumerate(items, 1):
@@ -1115,18 +1112,16 @@ def run_gaia_evaluation(args: argparse.Namespace) -> dict[str, Any]:
             max_stage1_workers=args.max_stage1_workers,
             stage2_max_tokens=args.stage2_max_tokens,
             enable_stage2_score=not args.without_stage2_score,
-            enable_stage1_early_stop=args.enable_stage1_early_stop,
-            enable_stage1_tool_use=args.enable_stage1_tool_use,
+            enable_agent_tool_use=args.enable_agent_tool_use,
             enable_evidence_prepare=args.evidence_prepare,
             enable_compact_search_evidence=args.compact_search_evidence,
             enable_evidence_driven_search=args.enable_evidence_driven_search,
             bypass_search_labeler=args.bypass_search_labeler,
             max_parallel_next_hop_queries=args.max_parallel_next_hop_queries,
-            enable_candidate_verification_search=args.candidate_verification_search,
             candidate_verification_max_queries=args.candidate_verification_max_queries,
             candidate_verification_workers=args.candidate_verification_workers,
-            max_stage1_tool_turns=args.max_stage1_tool_turns,
-            stage1_prepared_search_budget=args.stage1_prepared_search_budget,
+            max_agent_tool_turns=args.max_agent_tool_turns,
+            agent_prepared_search_budget=args.agent_prepared_search_budget,
             previous_best_agent_id=previous_best_agent_id,
             stage1_early_stop_max_retries=args.stage1_early_stop_max_retries,
             stage2_verifier=args.stage2_verifier,
@@ -1134,7 +1129,6 @@ def run_gaia_evaluation(args: argparse.Namespace) -> dict[str, Any]:
             versa_prm_base_model=args.versa_prm_base_model,
             versa_prm_device=args.versa_prm_device,
             versa_prm_dtype=args.versa_prm_dtype,
-            versa_prm_local_files_only=args.versa_prm_local_files_only,
         )
         if result.get("exact_match") and result.get("winner_agent_id"):
             winner_id = str(result.get("winner_agent_id") or "")
@@ -1191,7 +1185,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Comma-separated GAIA task ids (prefixes allowed). Overrides --max-samples.",
     )
     parser.add_argument(
-        "--stage1-seed",
+        "--agent-seed",
         default=None,
         help=(
             "Base seed for Stage1 sampling, so a rerun of unchanged code is "
@@ -1236,26 +1230,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="VersaPRM torch dtype.",
     )
     parser.add_argument(
-        "--versa-prm-local-files-only",
-        default=env_bool("VERSA_PRM_LOCAL_FILES_ONLY", True),
-        action="store_true",
-        help="Only use local Hugging Face cache for VersaPRM.",
-    )
-    parser.add_argument(
-        "--versa-prm-allow-download",
-        dest="versa_prm_local_files_only",
-        action="store_false",
-        help="Allow Hugging Face network downloads for VersaPRM.",
-    )
-    parser.add_argument(
         "--skip-versa-prm-cache-warmup",
         action="store_true",
         help="Skip startup Hugging Face cache warm-up for VersaPRM.",
-    )
-    parser.add_argument(
-        "--versa-prm-cache-warmup-local-only",
-        action="store_true",
-        help="Check VersaPRM cache at startup without downloading missing files.",
     )
     parser.add_argument(
         "--without-stage2-score",
@@ -1264,17 +1241,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Skip Stage2 judge scoring and rank agents by Stage1 confidence plus penalties.",
     )
     parser.add_argument(
-        "--enable-stage1-tool-use",
+        "--enable-agent-tool-use",
         action=argparse.BooleanOptionalAction,
         default=True,
         help=(
-            "Let Stage 1 call tools. On by default: every recorded benchmark run "
+            "Let agents call tools. On by default: every recorded benchmark run "
             "has it enabled (159 of 159 task runs across level1_final_13, _15 and "
             "_16), so a default of off meant that omitting the flag silently ran a "
-            "different system. Disable with --no-enable-stage1-tool-use."
+            "different system. Disable with --no-enable-agent-tool-use."
         ),
     )
-    parser.add_argument("--evidence-prepare", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--evidence-prepare",
+        type=boolean_arg,
+        nargs="?",
+        const=True,
+        metavar="{true,false}",
+        default=True,
+        help=(
+            "Prepare attachment, deterministic, and search evidence. "
+            "Enabled by default; pass false to disable."
+        ),
+    )
     parser.add_argument("--compact-search-evidence", action="store_true")
     parser.add_argument("--enable-evidence-driven-search", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument(
@@ -1291,19 +1279,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=2,
         help="Maximum number of EfficientRAG filter queries searched in parallel.",
     )
-    parser.set_defaults(candidate_verification_search=False)
-    parser.add_argument(
-        "--enable-candidate-verification-search",
-        dest="candidate_verification_search",
-        action="store_true",
-        default=False,
-        help=(
-            "Enable bounded candidate evidence recovery when every factual "
-            "candidate is unsupported. Off by default: an A/B run showed it "
-            "can promote wrong candidates whose text co-occurs with question "
-            "terms (opt in for controlled experiments)."
-        ),
-    )
     parser.add_argument(
         "--candidate-verification-max-queries",
         type=int,
@@ -1316,17 +1291,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=2,
         help="Maximum number of candidate verification searches executed in parallel.",
     )
-    parser.add_argument("--max-stage1-tool-turns", type=int, default=4)
+    parser.add_argument("--max-agent-tool-turns", type=int, default=4)
     parser.add_argument(
-        "--stage1-prepared-search-budget",
+        "--agent-prepared-search-budget",
         type=int,
         default=2,
         help=(
-            "Task-level supplemental Stage1 search budget when Evidence Prepare already "
+            "Task-level supplemental agent search budget when Evidence Prepare already "
             "has usable search evidence. Use -1 to disable the gate."
         ),
     )
-    parser.add_argument("--enable-stage1-early-stop", action="store_true")
     parser.add_argument("--stage1-early-stop-max-retries", type=int, default=1)
     parser.add_argument("--temperature", type=float, default=0.5)
     parser.add_argument("--models", default=None, help="Comma-separated model aliases understood by SLM_Agent.")

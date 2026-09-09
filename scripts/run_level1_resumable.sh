@@ -77,11 +77,11 @@ for attempt in $(seq 1 "${MAX_ATTEMPTS}"); do
         --level 1 \
         --task-ids "${TODO}" \
         --stage1-runs-per-agent 3 \
-        --evidence-prepare \
+        --evidence-prepare true \
         --enable-evidence-driven-search \
-        --enable-stage1-tool-use \
+        --enable-agent-tool-use \
         --bypass-search-labeler \
-        --stage1-prepared-search-budget 2 \
+        --agent-prepared-search-budget 2 \
         --log-name "${LOG_NAME}" >> "${RUN_LOG}" 2>&1
     STATUS=$?
     echo "[resume] attempt ${attempt} exited ${STATUS}"

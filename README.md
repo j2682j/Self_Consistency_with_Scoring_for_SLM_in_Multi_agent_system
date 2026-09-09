@@ -36,26 +36,26 @@ AgentConsis-Verify是一套以本地小型語言模型為核心的多代理人�
 
 ### 必要安裝 
 
-'''
+```
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python -m playwright install chromium
-'''
+```
 
 `requirements.txt` 目前使用 CUDA 12.8 的 PyTorch wheel。若主機使用其他 CUDA 版本或 CPU，請先改成相符的 PyTorch 套件來源。
 
 ### 安裝 Ollama 模型
-'''
+```
 ollama pull nemotron-3-nano:4b
 ollama pull qwen3:4b
 ollama pull gemma3:4b
 ollama pull qwen3-vl:4b
 ollama list
-'''
+```
 ### 啟動 SearXNG
-'''
+```
 docker compose -f searxng/core-config/docker-compose.yml up -d
-'''
+```
 
 確認 JSON 搜尋介面：
 
@@ -81,12 +81,12 @@ python run_gaia.py [-h] [--split {validation,test}] [--level {1,2,3}]
                    [--max-samples N] [--task-ids IDS]
                    [--stage1-runs-per-agent N] [--max-stage1-workers N]
                    [--temperature T] [--models MODEL_LIST]
-                   [--evidence-prepare | --no-evidence-prepare]
-                   [--enable-stage1-tool-use] [--without-stage2-score]
+                   [--evidence-prepare {true,false}]
+                   [--enable-agent-tool-use] [--without-stage2-score]
                    [--log-name NAME]
 ```
 
-未指定額外開關時，Evidence Prepare、evidence-driven search 與 VersaPRM Stage2 皆會啟用；Stage1 Tool Use 與 candidate verification search 預設關閉。
+未指定額外開關時，Evidence Prepare、evidence-driven search、Agent Tool Use 與 VersaPRM Stage2 皆會啟用；命令列流程中的 candidate verification search 固定關閉，VersaPRM 固定只從本地 cache 載入。
 
 ### 主要參數
 
@@ -97,25 +97,20 @@ python run_gaia.py [-h] [--split {validation,test}] [--level {1,2,3}]
 | `--level` | 全部 | 限定 GAIA Level 1、2 或 3。 |
 | `--max-samples` | `1` | 最多執行題數。 |
 | `--task-ids` | 無 | 以逗號指定 task id 或 id prefix，優先於 `--max-samples`。 |
-| `--stage1-seed` | `42` | Stage1 重現種子；使用 `off` 關閉固定種子。 |
-| `--stage1-runs-per-agent` | `3` | 每個 Agent 的獨立推理次數。 |
-| `--max-stage1-workers` | 自動 | Stage1 最大平行 worker 數；VRAM 不足時建議設為 `1`。 |
+| `--agent-seed` | `42` |  模型推理重現種子；使用 `off` 關閉固定種子。 |
+| `--agent-runs-per-agent` | `3` | 每個 Agent 的獨立推理次數。 |
+| `--max-agent-workers` | 自動 | Stage1 最大平行 worker 數；VRAM 不足時建議設為 `1`。 |
 | `--temperature` | `0.5` | Stage1 生成溫度。 |
 | `--models` | 三個預設 Agent | 以逗號指定 Ollama 模型名稱。 |
-| `--evidence-prepare` | 開啟 | 執行附件、deterministic 與網路證據準備。 |
-| `--no-evidence-prepare` | 關閉 | 跳過 Evidence Prepare。 |
+| `--evidence-prepare {true,false}` | `true` | 執行附件、deterministic 與網路證據準備；傳入 `false` 可關閉。 |
 | `--enable-evidence-driven-search` | 開啟 | 啟用關係目標與 next-hop retrieval。 |
 | `--bypass-search-labeler` | 關閉 | 跳過 EfficientRAG Labeler，直接建立句子級 evidence units。 |
 | `--compact-search-evidence` | 關閉 | 使用較精簡的搜尋證據內容。 |
-| `--enable-stage1-tool-use` | 關閉 | 允許 Agent 在推理過程提出工具請求。 |
-| `--max-stage1-tool-turns` | `4` | Stage1 單次 trajectory 的基礎工具回合上限。 |
-| `--stage1-prepared-search-budget` | `2` | 已有 prepared evidence 時，Stage1 可補充搜尋的任務級預算。 |
-| `--enable-stage1-early-stop` | 關閉 | 啟用 Stage1 early-stop 實驗模式。 |
+| `--enable-agent-tool-use` | 開啟 | 允許 Agent 在推理過程提出工具請求；可用 `--no-enable-agent-tool-use` 關閉。 |
+| `--max-agent-tool-turns` | `4` | Agent 單次 trajectory 的基礎工具回合上限。 |
+| `--agent-prepared-search-budget` | `2` | 已有 prepared evidence 時，Agent 可補充搜尋的任務級預算。 |
 | `--without-stage2-score` | 關閉 | 跳過 VersaPRM scoring。 |
 | `--stage2-verifier` | `versa` | Stage2 verifier；目前僅支援 VersaPRM。 |
-| `--versa-prm-local-files-only` | 開啟 | 只從本地 Hugging Face cache 載入 VersaPRM。 |
-| `--versa-prm-allow-download` | 關閉 | 允許啟動時下載缺少的 VersaPRM 檔案。 |
-| `--enable-candidate-verification-search` | 關閉 | 所有 factual candidates 均 unsupported 時，執行受限候選驗證搜尋。 |
 | `--log-name` | `gaia_run` | 輸出目錄與 Markdown 報告名稱。 |
 | `--output-dir` | 自動 | 覆寫逐題 JSON 輸出目錄。 |
 | `--report-md` | 自動 | 覆寫 Markdown 報告路徑。 |
@@ -131,7 +126,7 @@ python run_gaia.py --help
 單題 smoke test：
 
 ```bash
-/c/SCP/venv312/Scripts/python.exe run_gaia.py \
+run_gaia.py \
   --split validation \
   --level 1 \
   --max-samples 1 \
@@ -141,41 +136,29 @@ python run_gaia.py --help
 完整 Level 1 實驗：
 
 ```bash
-/c/SCP/venv312/Scripts/python.exe run_gaia.py \
+run_gaia.py \
   --split validation \
   --level 1 \
   --max-samples 53 \
   --stage1-runs-per-agent 3 \
   --max-stage1-workers 1 \
   --temperature 0.3 \
-  --enable-stage1-tool-use \
-  --max-stage1-tool-turns 4 \
-  --stage1-prepared-search-budget 2 \
-  --versa-prm-local-files-only \
+  --enable-agent-tool-use \
+  --max-agent-tool-turns 4 \
+  --agent-prepared-search-budget 2 \
   --log-name level1_full_system
 ```
 
-關閉 Labeler 的檢索對照實驗：
+
+關閉 Agent Tool Use 的執行方式：
 
 ```bash
-/c/SCP/venv312/Scripts/python.exe run_gaia.py \
-  --split validation \
-  --level 1 \
-  --max-samples 53 \
-  --bypass-search-labeler \
-  --log-name level1_without_labeler
-```
-
-只執行 Stage1 與 Stage2，不預先準備證據：
-
-```bash
-/c/SCP/venv312/Scripts/python.exe run_gaia.py \
+run_gaia.py \
   --split validation \
   --level 1 \
   --max-samples 10 \
-  --no-evidence-prepare \
-  --enable-stage1-tool-use \
-  --log-name level1_stage1_stage2_only
+  --no-enable-agent-tool-use \
+  --log-name level1_without_agent_tools
 ```
 
 ## 環境設定
@@ -210,7 +193,6 @@ VERSA_PRM_MODEL=UW-Madison-Lee-Lab/VersaPRM-Base-3B
 VERSA_PRM_BASE_MODEL=meta-llama/Llama-3.2-3B-Instruct
 VERSA_PRM_DEVICE=auto
 VERSA_PRM_DTYPE=auto
-VERSA_PRM_LOCAL_FILES_ONLY=true
 
 # Reproducibility / Hugging Face
 SCP_STAGE1_SEED=42
@@ -223,18 +205,18 @@ HF_TOKEN=
 
 | 系統角色 | 預設模型 | 執行方式 |
 |---|---|---|
-| Stage1 Agent 1 | `nemotron-3-nano:4b` | Ollama native chat |
-| Stage1 Agent 2 | `qwen3:4b` | Ollama native chat |
-| Stage1 Agent 3 | `gemma3:4b` | Ollama native chat |
+| Agent 1 | `nemotron-3-nano:4b` | Ollama native chat |
+| Agent 2 | `qwen3:4b` | Ollama native chat |
+| Agent 3 | `gemma3:4b` | Ollama native chat |
 | Query Generator | `qwen3:4b` | Ollama native chat，完成後 `keep_alive: 0` |
-| Attachment Strategy | `qwen3:4b` | Ollama native chat |
+| Attachment Strategy | `qwen3:4b` | Ollama native chat，完成後釋放 |
 | Span Role / Semantic Fact | `qwen3:4b` | Ollama native chat，完成後釋放 |
 | Vision / Video Frames | `qwen3-vl:4b` | Ollama native chat，使用後釋放 |
 | Semantic Impact / Retrieval | `BAAI/bge-m3` | Transformers |
 | EfficientRAG Labeler | `models/labeler_v2` | Transformers，預設 CPU |
-| Stage2 Verifier | `VersaPRM-Base-3B` | Transformers / PEFT |
+| Reasoning Verifier | `VersaPRM-Base-3B` | Transformers / PEFT |
 
-Stage1 的預設 Agent 定義位於 `benchmark/gaia/gaia_runner.py`；alias 與實際 Ollama model id 的對應位於 `core/model_registry.py`。
+預設 Agent 定義位於 `benchmark/gaia/gaia_runner.py`；alias 與實際 Ollama model id 的對應位於 `core/model_registry.py`。
 
 ## 工具模組
 
@@ -298,13 +280,13 @@ Markdown 報告包含實驗設定、逐題結果、整體準確率、平均 toke
 測試不會由 `run_gaia.py` 載入。只有開發、重構與驗收時需要執行：
 
 ```bash
-/c/SCP/venv312/Scripts/python.exe -m pytest -q
+python -m pytest -q
 ```
 
 檢查主要 Python package 是否可編譯：
 
 ```bash
-/c/SCP/venv312/Scripts/python.exe -m compileall benchmark context core parsers score tools
+python -m compileall benchmark context core parsers score tools
 ```
 
 離線 replay 與診斷工具位於 `scripts/`，可在不重新呼叫 Agent、VersaPRM 或網路服務的情況下分析既有 task JSON。
@@ -398,7 +380,7 @@ Question
 
 每一題使用獨立的 temporary corpus 與 FAISS index。嚴格證據可進入後續 Evidence Support Check；未通過完整 contract 的高相關 passage 只作為 unverified reference 提供給 Agent 閱讀，不會因此取得可信支持等級。
 
-### Stage1 多代理人推理
+### Agent Reasoning 多代理人推理
 
 Stage1 預設使用三個不同 SLM Agent，每個 Agent 在相同問題與共享證據下獨立推理三次。每次輸出會先經過 structured schema parser、reasoning parser 與 answer repair，再進行 Agent 內答案聚合。
 
@@ -412,7 +394,7 @@ confidence_i = m_i / R
 
 啟用 Stage1 Tool Use 後，Agent 可輸出工具請求。`Stage1ToolUseRunner` 會解析請求、檢查工具能力與重複呼叫、執行工具、驗證結果，再將新證據回傳同一條 trajectory。若 Evidence Prepare 已有可用 search evidence，額外搜尋會受 task-level budget 限制。
 
-### Stage2 推理步驟驗證
+### Reasoning Steps Verify 推理步驟驗證
 
 Reasoning Parser 先將 Agent 輸出切分為獨立步驟，並從最後一個 reasoning step 移除 Final Answer 區塊。VersaPRM 接收問題與已解析步驟，為每一步保留 reward probability：
 
@@ -463,5 +445,3 @@ Validity
 ## 專案狀態
 
 SCP 是持續開發中的研究程式，主要用於 GAIA 實驗、證據漏斗分析、候選答案選擇與 ablation study。資料結構、模型 checkpoint 與實驗參數仍可能隨研究進度調整。
-
-本專案目前未提供獨立授權檔案；加入正式 license 前，請勿假設可自由再散布。

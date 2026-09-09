@@ -1,14 +1,12 @@
-# SCP：小型語言模型協作推理與證據驗證系統
+# AgentConsis-Verify
 
-SCP（Small-model Collaborative Pipeline）是一套以本地小型語言模型為核心的多代理人研究系統，主要用於執行 GAIA 類型的複合任務。系統將網路檢索、附件解析、確定型工具、多次獨立推理、過程驗證與最終答案選擇整合成可追蹤的實驗流程。
+AgentConsis-Verify是一套以本地小型語言模型為核心的多代理人研究系統，主要用於執行 GAIA 類型的複合任務。系統將網路檢索、附件解析、確定型工具、多次獨立推理、過程驗證與最終答案選擇整合成可追蹤的實驗流程。
 
 正式流程分為三個主要模組：
 
 - **Evidence Prepare（證據準備）**：依任務與附件資訊取得網頁、文件、圖片、音訊、影片及確定型工具結果，整理成可供推理與驗證使用的證據。
-- **Stage1（多代理人自我一致性）**：多個 SLM Agent 在共享問題與證據下重複推理，必要時可在受限回合內主動呼叫工具。
-- **Stage2（推理驗證與答案選擇）**：使用 VersaPRM 對解析後的推理步驟計算 reward probability，再透過 Evidence Support Check 與 Ordered Gates 選出最終答案。
-
-本專案用於研究與實驗分析，不是正式產品或通用自動化 Agent 平台。
+- **Agent Reasoning**：多個 SLM Agent 在共享問題與證據下重複推理，必要時可在受限回合內主動呼叫工具。
+- **Reasoning Step Verify（推理驗證與答案選擇）**：使用 VersaPRM 對解析後的推理步驟計算 reward probability，再透過 Evidence Support Check 與 Ordered Gates 選出最終答案。
 
 ## 支援的任務能力
 
@@ -36,46 +34,28 @@ SCP（Small-model Collaborative Pipeline）是一套以本地小型語言模型�
 - Stockfish：棋類 handler
 - Hugging Face 帳號：GAIA、VersaPRM 與其 gated base model
 
-### 安裝 Python 套件
+### 必要安裝 
 
-PowerShell：
-
-```powershell
-cd C:\SCP
-python -m venv venv312
-.\venv312\Scripts\Activate.ps1
+'''
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python -m playwright install chromium
-```
-
-Git Bash：
-
-```bash
-cd /c/SCP
-source /c/SCP/venv312/Scripts/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m playwright install chromium
-```
+'''
 
 `requirements.txt` 目前使用 CUDA 12.8 的 PyTorch wheel。若主機使用其他 CUDA 版本或 CPU，請先改成相符的 PyTorch 套件來源。
 
 ### 安裝 Ollama 模型
-
-```bash
+'''
 ollama pull nemotron-3-nano:4b
 ollama pull qwen3:4b
 ollama pull gemma3:4b
 ollama pull qwen3-vl:4b
 ollama list
-```
-
+'''
 ### 啟動 SearXNG
-
-```bash
+'''
 docker compose -f searxng/core-config/docker-compose.yml up -d
-```
+'''
 
 確認 JSON 搜尋介面：
 

@@ -1242,7 +1242,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--enable-agent-tool-use",
-        action=argparse.BooleanOptionalAction,
+        type=boolean_arg,
+        const=True,
+        metavar="{true,false}",
         default=True,
         help=(
             "Let agents call tools. On by default: every recorded benchmark run "

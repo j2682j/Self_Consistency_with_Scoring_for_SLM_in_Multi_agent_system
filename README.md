@@ -106,7 +106,7 @@ python run_gaia.py [-h] [--split {validation,test}] [--level {1,2,3}]
 | `--enable-evidence-driven-search` | 開啟 | 啟用關係目標與 next-hop retrieval。 |
 | `--bypass-search-labeler` | 關閉 | 跳過 EfficientRAG Labeler，直接建立句子級 evidence units。 |
 | `--compact-search-evidence` | 關閉 | 使用較精簡的搜尋證據內容。 |
-| `--enable-agent-tool-use` | 開啟 | 允許 Agent 在推理過程提出工具請求；可用 `--no-enable-agent-tool-use` 關閉。 |
+| `--enable-agent-tool-use` | 開啟 | 允許 Agent 在推理過程提出工具請求，False可關閉。 |
 | `--max-agent-tool-turns` | `4` | Agent 單次 trajectory 的基礎工具回合上限。 |
 | `--agent-prepared-search-budget` | `2` | 已有 prepared evidence 時，Agent 可補充搜尋的任務級預算。 |
 | `--without-stage2-score` | 關閉 | 跳過 VersaPRM scoring。 |
@@ -140,8 +140,8 @@ run_gaia.py \
   --split validation \
   --level 1 \
   --max-samples 53 \
-  --stage1-runs-per-agent 3 \
-  --max-stage1-workers 1 \
+  --agent-runs-per-agent 3 \
+  --max-agent-workers 1 \
   --temperature 0.3 \
   --enable-agent-tool-use \
   --max-agent-tool-turns 4 \
@@ -157,14 +157,11 @@ run_gaia.py \
   --split validation \
   --level 1 \
   --max-samples 10 \
-  --no-enable-agent-tool-use \
+  --enable-agent-tool-use False \
   --log-name level1_without_agent_tools
 ```
 
 ## 環境設定
-
-在專案根目錄建立 `.env`。此檔案已由 `.gitignore` 排除，不應提交 token 或 API key。
-
 ```env
 # Ollama / SLM
 LLM_PROVIDER=ollama
@@ -194,9 +191,6 @@ VERSA_PRM_BASE_MODEL=meta-llama/Llama-3.2-3B-Instruct
 VERSA_PRM_DEVICE=auto
 VERSA_PRM_DTYPE=auto
 
-# Reproducibility / Hugging Face
-SCP_STAGE1_SEED=42
-HF_TOKEN=
 ```
 
 `SEARCH_BACKEND=hybrid` 會依可用狀態選擇搜尋後端。SearXNG 不需要 API key；Tavily、SerpAPI 與 Perplexity 只有在對應環境變數存在時才會使用。
